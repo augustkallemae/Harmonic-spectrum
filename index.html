@@ -16,7 +16,7 @@
             margin-top: 10px;
         }
         input[type="range"] {
-            width: 300px; /* Liugurite laius */
+            width: 300px; /* Pikem liugur */
         }
         canvas {
             border: 1px solid black;
@@ -26,6 +26,7 @@
 <body>
     <h1>Harmonic Spectrum</h1>
 
+    <!-- Loome sageduse sektsioonid -->
     <div class="frequency-section" id="220Hz">
         <h3>220 Hz</h3>
         <canvas id="canvas220" width="500" height="150"></canvas>
@@ -44,35 +45,83 @@
         </div>
     </div>
 
-    <!-- Lisa sagedused, kui vaja -->
+    <div class="frequency-section" id="660Hz">
+        <h3>660 Hz</h3>
+        <canvas id="canvas660" width="500" height="150"></canvas>
+        <div class="slider-container">
+            <input type="range" id="slider660" min="0" max="1" step="0.01" value="0" />
+            <label for="slider660">Amplitude</label>
+        </div>
+    </div>
+
+    <div class="frequency-section" id="880Hz">
+        <h3>880 Hz</h3>
+        <canvas id="canvas880" width="500" height="150"></canvas>
+        <div class="slider-container">
+            <input type="range" id="slider880" min="0" max="1" step="0.01" value="0" />
+            <label for="slider880">Amplitude</label>
+        </div>
+    </div>
+
+    <div class="frequency-section" id="1100Hz">
+        <h3>1100 Hz</h3>
+        <canvas id="canvas1100" width="500" height="150"></canvas>
+        <div class="slider-container">
+            <input type="range" id="slider1100" min="0" max="1" step="0.01" value="0" />
+            <label for="slider1100">Amplitude</label>
+        </div>
+    </div>
+
+    <div class="frequency-section" id="1320Hz">
+        <h3>1320 Hz</h3>
+        <canvas id="canvas1320" width="500" height="150"></canvas>
+        <div class="slider-container">
+            <input type="range" id="slider1320" min="0" max="1" step="0.01" value="0" />
+            <label for="slider1320">Amplitude</label>
+        </div>
+    </div>
+
+    <div class="frequency-section" id="1540Hz">
+        <h3>1540 Hz</h3>
+        <canvas id="canvas1540" width="500" height="150"></canvas>
+        <div class="slider-container">
+            <input type="range" id="slider1540" min="0" max="1" step="0.01" value="0" />
+            <label for="slider1540">Amplitude</label>
+        </div>
+    </div>
 
     <script>
-        // Web Audio API seadistamine
+        // Web Audio API
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-        function playTone(frequency, amplitude) {
+        function createOscillator(frequency) {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
+
+            oscillator.type = "sine";
             oscillator.frequency.value = frequency;
-            gainNode.gain.value = amplitude;
+
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime); // Algse amplituudi seadistamine
 
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
+
             oscillator.start();
-
-            return oscillator; // Tagasta generaator edasiseks kontrollimiseks
+            return { oscillator, gainNode };
         }
 
-        function stopTone(oscillator) {
-            if (oscillator) {
-                oscillator.stop();
-            }
+        function updateGain(gainNode, amplitude) {
+            gainNode.gain.linearRampToValueAtTime(amplitude, audioContext.currentTime + 0.1); // Sujuv muutus
         }
 
-        // Joonista seisulained sõlmede ja paisetega
-        function drawWave(canvasId, frequency, amplitude, harmonics) {
+        function stopOscillator(oscillator) {
+            oscillator.stop(audioContext.currentTime + 0.1); // Sujuv lõpetamine
+        }
+
+        // Seisulainete joonistamine
+        function drawWave(canvasId, harmonics, amplitude) {
             const canvas = document.getElementById(canvasId);
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext("2d");
             const width = canvas.width;
             const height = canvas.height;
             const centerY = height / 2;
@@ -83,7 +132,7 @@
             ctx.beginPath();
             ctx.moveTo(0, centerY);
             for (let x = 0; x <= width; x++) {
-                const y = Math.sin((2 * Math.PI * harmonics * x) / width) * (centerY * amplitude);
+                const y = Math.sin((2 * Math.PI * harmonics * x) / width) * amplitude * (height / 2);
                 ctx.lineTo(x, centerY - y);
             }
             ctx.stroke();
@@ -95,43 +144,51 @@
 
                 ctx.beginPath();
                 ctx.arc(x, centerY, 5, 0, 2 * Math.PI);
-                ctx.fillStyle = isNode ? 'red' : 'green'; // Sõlmed punased, paised rohelised
+                ctx.fillStyle = isNode ? "red" : "green"; // Sõlmed ja paised
                 ctx.fill();
             }
         }
 
-        // Heli ja joonise haldamine
+        // Liuguri sündmuste haldamine
         const oscillators = {};
 
-        function updateWave(frequency, sliderId, canvasId, harmonics) {
-            const amplitude = document.getElementById(sliderId).value;
+        function handleSlider(frequency, sliderId, canvasId, harmonics) {
+            const slider = document.getElementById(sliderId);
+            slider.addEventListener("input", () => {
+                const amplitude = parseFloat(slider.value);
+                drawWave(canvasId, harmonics, amplitude);
 
-            // Joonista seisulaine
-            drawWave(canvasId, frequency, amplitude, harmonics);
-
-            // Halda heli
-            if (oscillators[frequency]) {
-                stopTone(oscillators[frequency]);
-                delete oscillators[frequency];
-            }
-            if (amplitude > 0) {
-                oscillators[frequency] = playTone(frequency, amplitude);
-            }
+                if (amplitude > 0) {
+                    if (!oscillators[frequency]) {
+                        oscillators[frequency] = createOscillator(frequency);
+                    }
+                    updateGain(oscillators[frequency].gainNode, amplitude);
+                } else if (oscillators[frequency]) {
+                    stopOscillator(oscillators[frequency].oscillator);
+                    delete oscillators[frequency];
+                }
+            });
         }
 
         // Sidumine liuguritega
-        document.getElementById('slider220').addEventListener('input', () => {
-            updateWave(220, 'slider220', 'canvas220', 1);
-        });
+        handleSlider(220, "slider220", "canvas220", 1);
+        handleSlider(440, "slider440", "canvas440", 2);
+        handleSlider(660, "slider660", "canvas660", 3);
+        handleSlider(880, "slider880", "canvas880", 4);
+        handleSlider(1100, "slider1100", "canvas1100", 5);
+        handleSlider(1320, "slider1320", "canvas1320", 6);
+        handleSlider(1540, "slider1540", "canvas1540", 7);
 
-        document.getElementById('slider440').addEventListener('input', () => {
-            updateWave(440, 'slider440', 'canvas440', 2);
-        });
-
-        // Esialgne joonis
-        drawWave('canvas220', 220, 0, 1);
-        drawWave('canvas440', 440, 0, 2);
+        // Esialgne seisulainete joonis
+        drawWave("canvas220", 1, 0);
+        drawWave("canvas440", 2, 0);
+        drawWave("canvas660", 3, 0);
+        drawWave("canvas880", 4, 0);
+        drawWave("canvas1100", 5, 0);
+        drawWave("canvas1320", 6, 0);
+        drawWave("canvas1540", 7, 0);
     </script>
 </body>
 </html>
+
 
