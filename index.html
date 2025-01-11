@@ -15,6 +15,9 @@
         .slider-container {
             margin-top: 10px;
         }
+        input[type="range"] {
+            width: 300px; /* Liugurite laius */
+        }
         canvas {
             border: 1px solid black;
         }
@@ -25,7 +28,7 @@
 
     <div class="frequency-section" id="220Hz">
         <h3>220 Hz</h3>
-        <canvas id="canvas220" width="500" height="100"></canvas>
+        <canvas id="canvas220" width="500" height="150"></canvas>
         <div class="slider-container">
             <input type="range" id="slider220" min="0" max="1" step="0.01" value="0" />
             <label for="slider220">Amplitude</label>
@@ -34,118 +37,101 @@
 
     <div class="frequency-section" id="440Hz">
         <h3>440 Hz</h3>
-        <canvas id="canvas440" width="500" height="100"></canvas>
+        <canvas id="canvas440" width="500" height="150"></canvas>
         <div class="slider-container">
             <input type="range" id="slider440" min="0" max="1" step="0.01" value="0" />
             <label for="slider440">Amplitude</label>
         </div>
     </div>
 
-    <div class="frequency-section" id="660Hz">
-        <h3>660 Hz</h3>
-        <canvas id="canvas660" width="500" height="100"></canvas>
-        <div class="slider-container">
-            <input type="range" id="slider660" min="0" max="1" step="0.01" value="0" />
-            <label for="slider660">Amplitude</label>
-        </div>
-    </div>
-
-    <div class="frequency-section" id="880Hz">
-        <h3>880 Hz</h3>
-        <canvas id="canvas880" width="500" height="100"></canvas>
-        <div class="slider-container">
-            <input type="range" id="slider880" min="0" max="1" step="0.01" value="0" />
-            <label for="slider880">Amplitude</label>
-        </div>
-    </div>
-
-    <div class="frequency-section" id="1100Hz">
-        <h3>1100 Hz</h3>
-        <canvas id="canvas1100" width="500" height="100"></canvas>
-        <div class="slider-container">
-            <input type="range" id="slider1100" min="0" max="1" step="0.01" value="0" />
-            <label for="slider1100">Amplitude</label>
-        </div>
-    </div>
-
-    <div class="frequency-section" id="1320Hz">
-        <h3>1320 Hz</h3>
-        <canvas id="canvas1320" width="500" height="100"></canvas>
-        <div class="slider-container">
-            <input type="range" id="slider1320" min="0" max="1" step="0.01" value="0" />
-            <label for="slider1320">Amplitude</label>
-        </div>
-    </div>
-
-    <div class="frequency-section" id="1540Hz">
-        <h3>1540 Hz</h3>
-        <canvas id="canvas1540" width="500" height="100"></canvas>
-        <div class="slider-container">
-            <input type="range" id="slider1540" min="0" max="1" step="0.01" value="0" />
-            <label for="slider1540">Amplitude</label>
-        </div>
-    </div>
+    <!-- Lisa sagedused, kui vaja -->
 
     <script>
-        function drawWave(canvasId, frequency, amplitude) {
+        // Web Audio API seadistamine
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTone(frequency, amplitude) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.frequency.value = frequency;
+            gainNode.gain.value = amplitude;
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.start();
+
+            return oscillator; // Tagasta generaator edasiseks kontrollimiseks
+        }
+
+        function stopTone(oscillator) {
+            if (oscillator) {
+                oscillator.stop();
+            }
+        }
+
+        // Joonista seisulained sõlmede ja paisetega
+        function drawWave(canvasId, frequency, amplitude, harmonics) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
             const width = canvas.width;
             const height = canvas.height;
+            const centerY = height / 2;
+
             ctx.clearRect(0, 0, width, height);
+
+            // Joonista seisulaine
             ctx.beginPath();
-            ctx.moveTo(0, height / 2);
-
-            const angularFrequency = 2 * Math.PI * frequency / 500; // Normalize frequency to canvas width
+            ctx.moveTo(0, centerY);
             for (let x = 0; x <= width; x++) {
-                const y = Math.sin(angularFrequency * x) * (height / 2) * amplitude;
-                ctx.lineTo(x, height / 2 - y);
+                const y = Math.sin((2 * Math.PI * harmonics * x) / width) * (centerY * amplitude);
+                ctx.lineTo(x, centerY - y);
             }
-
             ctx.stroke();
+
+            // Joonista sõlmed ja paised
+            for (let i = 0; i <= harmonics; i++) {
+                const x = (i * width) / harmonics;
+                const isNode = i % 2 === 0;
+
+                ctx.beginPath();
+                ctx.arc(x, centerY, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = isNode ? 'red' : 'green'; // Sõlmed punased, paised rohelised
+                ctx.fill();
+            }
         }
 
-        function updateWave(frequency, sliderId, canvasId) {
+        // Heli ja joonise haldamine
+        const oscillators = {};
+
+        function updateWave(frequency, sliderId, canvasId, harmonics) {
             const amplitude = document.getElementById(sliderId).value;
-            drawWave(canvasId, frequency, amplitude);
+
+            // Joonista seisulaine
+            drawWave(canvasId, frequency, amplitude, harmonics);
+
+            // Halda heli
+            if (oscillators[frequency]) {
+                stopTone(oscillators[frequency]);
+                delete oscillators[frequency];
+            }
+            if (amplitude > 0) {
+                oscillators[frequency] = playTone(frequency, amplitude);
+            }
         }
 
+        // Sidumine liuguritega
         document.getElementById('slider220').addEventListener('input', () => {
-            updateWave(1, 'slider220', 'canvas220');
+            updateWave(220, 'slider220', 'canvas220', 1);
         });
 
         document.getElementById('slider440').addEventListener('input', () => {
-            updateWave(2, 'slider440', 'canvas440');
+            updateWave(440, 'slider440', 'canvas440', 2);
         });
 
-        document.getElementById('slider660').addEventListener('input', () => {
-            updateWave(3, 'slider660', 'canvas660');
-        });
-
-        document.getElementById('slider880').addEventListener('input', () => {
-            updateWave(4, 'slider880', 'canvas880');
-        });
-
-        document.getElementById('slider1100').addEventListener('input', () => {
-            updateWave(5, 'slider1100', 'canvas1100');
-        });
-
-        document.getElementById('slider1320').addEventListener('input', () => {
-            updateWave(6, 'slider1320', 'canvas1320');
-        });
-
-        document.getElementById('slider1540').addEventListener('input', () => {
-            updateWave(7, 'slider1540', 'canvas1540');
-        });
-
-        // Initial drawing with amplitude 0
-        drawWave('canvas220', 1, 0);
-        drawWave('canvas440', 2, 0);
-        drawWave('canvas660', 3, 0);
-        drawWave('canvas880', 4, 0);
-        drawWave('canvas1100', 5, 0);
-        drawWave('canvas1320', 6, 0);
-        drawWave('canvas1540', 7, 0);
+        // Esialgne joonis
+        drawWave('canvas220', 220, 0, 1);
+        drawWave('canvas440', 440, 0, 2);
     </script>
 </body>
 </html>
+
